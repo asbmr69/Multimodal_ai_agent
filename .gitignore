@@ -1,0 +1,120 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+.venv
+env.bak/
+venv.bak/
+
+# PyInstaller
+*.manifest
+*.spec
+dist/
+build/
+
+# PyQt and UI generated files
+*.ui.py
+*.qrc.py
+*.pro.user
+*.pro.user.*
+*.qmlc
+*.jsc
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+.spyderproject
+.spyproject
+
+# Application specific
+*.log
+logs/
+.env
+*.db
+*.sqlite
+*.sqlite3
+
+# API Keys and Secrets
+**/keys/
+credentials.json
+*_api_key.txt
+*_secret.txt
+
+# User data
+user_data/
+user_profiles/
+chat_history/
+agent_data/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+.temp/
+.tmp/
+
+# Generated documentation
+docs/_build/
+docs/api/
+site/
+
+# Build artifacts
+*.exe
+*.msi
+*.dmg
+*.app
+*.deb
+*.rpm
+AI_Agent_Desktop*
+
+# Auto-generated files
+auto_generated/
+generated_code/
+
+# Cache directories
+.cache/
+.webcache/
+__pycache__/ 
