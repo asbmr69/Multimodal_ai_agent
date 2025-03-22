@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QTextEdit,
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QProcess
 from PyQt6.QtGui import QFont, QColor, QTextCursor
 
-class Shell(QWidget):
+class Terminal(QWidget):
     """Terminal emulator widget for executing shell commands"""
     command_executed = pyqtSignal(str)
     
@@ -146,4 +146,149 @@ class Shell(QWidget):
         
     def connect_to_agent(self, agent_handler: Callable):
         """Connect shell to agent handler function"""
+        self.command_executed.connect(agent_handler)
+
+
+class Shell(QWidget):
+    """Interactive shell interface that connects to the computer agent."""
+    
+    command_executed = pyqtSignal(str)
+    
+    def __init__(self, parent=None, agent_controller=None):
+        super().__init__(parent)
+        self.agent_controller = agent_controller
+        self.process = None
+        self.current_directory = os.path.expanduser("~")
+        self.environment_vars = dict(os.environ)
+        
+        self._setup_ui()
+        self._connect_signals()
+    
+    def _setup_ui(self):
+        """Set up the Shell UI components"""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Create the terminal component
+        self.terminal = Terminal(self)
+        layout.addWidget(self.terminal)
+        
+        # Add a status bar
+        status_layout = QHBoxLayout()
+        
+        self.status_label = QLineEdit()
+        self.status_label.setReadOnly(True)
+        self.status_label.setStyleSheet("background-color: #007ACC; color: white; border: none;")
+        self.status_label.setText("Ready")
+        
+        self.kill_button = QPushButton("Kill Process")
+        self.kill_button.setStyleSheet("background-color: #C62828; color: white;")
+        self.kill_button.clicked.connect(self._kill_current_process)
+        self.kill_button.setEnabled(False)
+        
+        status_layout.addWidget(self.status_label)
+        status_layout.addWidget(self.kill_button)
+        
+        layout.addLayout(status_layout)
+    
+    def _connect_signals(self):
+        """Connect signal handlers"""
+        self.terminal.command_executed.connect(self._handle_command)
+    
+    def _handle_command(self, command):
+        """Handle command execution"""
+        # Special commands handling
+        if command.lower() == "clear" or command.lower() == "cls":
+            self.terminal.clear_output()
+            return
+        
+        # If we have an agent controller, delegate to it
+        if self.agent_controller:
+            self._set_executing_state(True)
+            # Create context for the computer agent
+            context = {
+                "action": "execute_command",
+                "command": command,
+                "current_directory": self.current_directory
+            }
+            
+            # In a real implementation, this would be async
+            # For simplicity, using a direct call pattern here
+            self.command_executed.emit(command)
+        else:
+            # Fallback to local execution with QProcess
+            self._execute_local_command(command)
+    
+    def _execute_local_command(self, command):
+        """Execute command locally if no agent is available"""
+        self._set_executing_state(True)
+        
+        # Create process
+        self.process = QProcess()
+        self.process.setWorkingDirectory(self.current_directory)
+        
+        # Set up environment
+        process_env = self.process.processEnvironment()
+        for key, value in self.environment_vars.items():
+            process_env.insert(key, value)
+        self.process.setProcessEnvironment(process_env)
+        
+        # Connect signals
+        self.process.readyReadStandardOutput.connect(self._on_stdout_ready)
+        self.process.readyReadStandardError.connect(self._on_stderr_ready)
+        self.process.finished.connect(self._on_process_finished)
+        
+        # On Windows, use cmd.exe to execute the command
+        if os.name == 'nt':
+            self.process.start("cmd.exe", ["/c", command])
+        else:
+            # On Unix, use bash
+            self.process.start("/bin/bash", ["-c", command])
+    
+    def _on_stdout_ready(self):
+        """Handle standard output from process"""
+        data = self.process.readAllStandardOutput().data().decode('utf-8', errors='replace')
+        self.terminal.display_result(data)
+    
+    def _on_stderr_ready(self):
+        """Handle standard error from process"""
+        data = self.process.readAllStandardError().data().decode('utf-8', errors='replace')
+        self.terminal.display_result(data, error=True)
+    
+    def _on_process_finished(self, exit_code, exit_status):
+        """Handle process completion"""
+        if exit_code != 0:
+            self.terminal.display_result(f"Process exited with code {exit_code}", error=True)
+        self._set_executing_state(False)
+    
+    def _set_executing_state(self, is_executing):
+        """Update UI based on execution state"""
+        self.kill_button.setEnabled(is_executing)
+        self.status_label.setText("Executing..." if is_executing else "Ready")
+        self.status_label.setStyleSheet(
+            "background-color: #E65100; color: white; border: none;" if is_executing 
+            else "background-color: #007ACC; color: white; border: none;"
+        )
+    
+    def _kill_current_process(self):
+        """Kill the currently running process"""
+        if self.process and self.process.state() == QProcess.ProcessState.Running:
+            self.process.kill()
+            self.terminal.display_result("Process terminated by user", error=True)
+            self._set_executing_state(False)
+    
+    def display_result(self, result, is_error=False):
+        """Display result in the terminal"""
+        self.terminal.display_result(result, error=is_error)
+        self._set_executing_state(False)
+    
+    def set_current_directory(self, directory):
+        """Update the current working directory"""
+        if os.path.isdir(directory):
+            self.current_directory = directory
+            self.terminal.set_current_directory(directory)
+    
+    def connect_to_agent(self, agent_handler):
+        """Connect shell to agent handler function"""
+        self.agent_controller = agent_handler
         self.command_executed.connect(agent_handler)

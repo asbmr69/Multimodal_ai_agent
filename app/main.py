@@ -1,5 +1,11 @@
 import sys
+import os
 import logging
+
+# Add parent directory to Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Now imports will work with 'app.' prefix
 from controller.app_controller import AppController
 from ui.main_window import MainWindow
 from PyQt6.QtWidgets import QApplication
@@ -32,7 +38,7 @@ def main():
     window.show()
     
     # Start the event loop
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 if __name__ == "__main__":
     main()

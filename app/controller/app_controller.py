@@ -26,9 +26,9 @@ class AppController:
     
     def _register_default_agents(self):
         """Register the default set of agents."""
-        from app.agents.coder_agent.coder_agent import CoderAgent
-        from app.agents.computer_agent.computer_agent import ComputerAgent
-        from app.agents.assistant_agent.assistant_agent import AssistantAgent
+        from agents.coder_agent.coder_agent import CoderAgent
+        from agents.computer_agent.computer_agent import ComputerAgent
+        from agents.assistant_agent.assistant_agent import AssistantAgent
         
         self.agent_manager.register_agent("coder", CoderAgent)
         self.agent_manager.register_agent("computer", ComputerAgent)

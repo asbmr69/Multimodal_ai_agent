@@ -9,8 +9,7 @@ from typing import Any
 from typing import List
 from typing import Dict
 from typing import Optional
-
-from app.agents.base_agent import BaseAgent
+from agents.base_agent import BaseAgent
 
 class CoderAgent(BaseAgent):
     """Agent for code generation, editing, and execution."""

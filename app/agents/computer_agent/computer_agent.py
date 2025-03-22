@@ -4,9 +4,9 @@ import subprocess
 from typing import Dict, Any, List, Optional
 import shutil
 
-from agents.base_agent import Agent
+from agents.base_agent import BaseAgent
 
-class ComputerAgent(Agent):
+class ComputerAgent(BaseAgent):
     type = "computer"
     capabilities = ["file_operations", "shell_execution", "task_automation"]
     

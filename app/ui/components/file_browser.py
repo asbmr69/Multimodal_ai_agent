@@ -1,8 +1,8 @@
 # app/ui/file_browser.py
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QTreeView, 
-                           QFileSystemModel, QLabel, QLineEdit,
-                           QPushButton, QHBoxLayout)
+                           QHeaderView, QFileDialog, QPushButton, QHBoxLayout, QLineEdit)
 from PyQt6.QtCore import Qt, pyqtSignal, QDir
+from PyQt6.QtGui import QFileSystemModel
 
 class FileExplorer(QWidget):
     file_selected = pyqtSignal(str)

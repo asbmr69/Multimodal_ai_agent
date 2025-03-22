@@ -38,7 +38,7 @@ try:
 except ImportError:
     DEEPSEEK_AVAILABLE = False
 
-from app.config import Config
+from config import Config
 
 class LLMController:
     """Manages communication with various LLM providers."""

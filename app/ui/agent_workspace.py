@@ -2,11 +2,11 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QTabWidget, 
                             QSplitter, QStackedWidget, QLabel)
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
+import asyncio
 
 from .components.code_editor import CodeEditor
-from .components.terminal import Terminal
+from .components.terminal import Terminal, Shell
 from .components.file_browser import FileExplorer
-from .components.terminal import Shell
 
 class AgentWorkspace(QWidget):
     status_message = pyqtSignal(str)
@@ -96,7 +96,7 @@ class AgentWorkspace(QWidget):
         return workspace
         
     def create_computer_workspace(self):
-        """Create a computer agent workspace with file explorer and shell"""
+        """Create workspace for computer agent"""
         workspace = QWidget()
         layout = QVBoxLayout(workspace)
         
@@ -107,7 +107,7 @@ class AgentWorkspace(QWidget):
         file_explorer = FileExplorer()
         
         # Add shell terminal
-        shell = Shell()
+        shell = Shell(agent_controller=self.handle_shell_command)
         
         # Add to splitter
         splitter.addWidget(file_explorer)
@@ -129,7 +129,7 @@ class AgentWorkspace(QWidget):
         layout.addWidget(content_label)
         return workspace
         
-    def close_agent_tab(self, index):
+    async def close_agent_tab(self, index):
         """Close an agent tab and clean up resources"""
         widget = self.agent_tabs.widget(index)
         
@@ -144,13 +144,85 @@ class AgentWorkspace(QWidget):
             # Remove from agents dict
             del self.agents[agent_type]
             
-            # Request agent termination from controller
-            self.core_controller.agent_manager.terminate_agent(agent_type)
-            
+            # Schedule agent termination asynchronously
+            asyncio.create_task(self._terminate_agent(agent_type))
+        
         # Remove tab
         self.agent_tabs.removeTab(index)
+
+    async def _terminate_agent(self, agent_type):
+        """Async helper to terminate an agent"""
+        await self.core_controller.agent_manager.terminate_agent(agent_type)
         
     def terminate_all_agents(self):
         """Terminate all active agents"""
         for agent_type in list(self.agents.keys()):
             self.core_controller.agent_manager.terminate_agent(agent_type)
+        
+    def handle_shell_command(self, command):
+        """Handle shell command execution through the computer agent"""
+        self.status_message.emit(f"Executing: {command}")
+        
+        # Create context for agent
+        context = {
+            "action": "execute_command",
+            "command": command
+        }
+        
+        # Execute asynchronously through the computer agent
+        async_task = asyncio.create_task(
+            self.core_controller.agent_manager.invoke_agent("computer", context)
+        )
+        
+        # Add callback to handle the response
+        async_task.add_done_callback(self._on_command_executed)
+    
+    def _on_command_executed(self, future):
+        """Handle completion of command execution"""
+        try:
+            result = future.result()
+            
+            # Find the shell widget to display the result
+            if "computer" in self.agents:
+                computer_tab = self.agents["computer"]
+                # Find the shell within the tab's widget hierarchy
+                shell = self._find_shell_widget(computer_tab)
+                if shell:
+                    # Display command result in the shell
+                    workspace_update = result.get("workspace_update", {})
+                    shell.display_result(workspace_update.get("result", "No output"))
+                    
+                    # Update current directory if changed
+                    current_dir = workspace_update.get("current_directory")
+                    if current_dir:
+                        shell.set_current_directory(current_dir)
+                
+                # Update status
+                self.status_message.emit("Command completed")
+                
+        except Exception as e:
+            self.status_message.emit(f"Error executing command: {str(e)}")
+    
+    def _find_shell_widget(self, parent):
+        """Find Shell widget in the widget hierarchy"""
+        # Check if parent is the shell
+        if isinstance(parent, Shell):
+            return parent
+            
+        # Check children
+        for child in parent.findChildren(Shell):
+            return child
+            
+        # Check for QSplitter and look inside its widgets
+        for splitter in parent.findChildren(QSplitter):
+            for i in range(splitter.count()):
+                widget = splitter.widget(i)
+                if isinstance(widget, Shell):
+                    return widget
+                
+                # Check inside this widget
+                shell = self._find_shell_widget(widget)
+                if shell:
+                    return shell
+        
+        return None
