@@ -391,30 +391,53 @@ class LLMController:
         Returns:
             Dictionary with agent type and action details
         """
-        # Simple heuristic detection
         content_lower = content.lower()
         
-        # Check for code-related content
-        if ("```" in content and any(lang in content_lower for lang in ["python", "javascript", "java", "c++"])) or \
-           any(keyword in content_lower for keyword in ["code", "function", "class", "programming"]):
-            return {
-                "agent_type": "coder",
-                "action": "analyze_code",
-                "content": content
-            }
-        
-        # Check for system operation content
-        elif any(keyword in content_lower for keyword in ["file", "directory", "folder", "execute", "command", "terminal"]):
-            return {
-                "agent_type": "computer",
-                "action": "process_command",
-                "content": content
-            }
-        
-        # Default to assistant
+        # Check for explicit agent mentions in the response
+        if "i'll use the coder agent" in content_lower or "using the coder agent" in content_lower:
+            agent_type = "coder"
+        elif "i'll use the computer agent" in content_lower or "using the computer agent" in content_lower:
+            agent_type = "computer"
         else:
-            return {
-                "agent_type": "assistant",
-                "action": "provide_information",
-                "content": content
-            }
+            # Check for code-related content
+            if ("```" in content and any(lang in content_lower for lang in ["python", "javascript", "java", "c++"])) or \
+               any(keyword in content_lower for keyword in ["code", "function", "class", "programming", "let's write"]):
+                agent_type = "coder"
+                action = "analyze_code"
+            
+            # Check for system operation content
+            elif any(keyword in content_lower for keyword in ["file", "directory", "folder", "execute", "command", "terminal"]):
+                agent_type = "computer"
+                action = "process_command"
+            
+            # Default to assistant
+            else:
+                agent_type = "assistant"
+                action = "provide_information"
+        
+        # Try to identify specific action patterns
+        if agent_type == "coder":
+            if "write" in content_lower or "create" in content_lower:
+                action = "write_code"
+            elif "fix" in content_lower or "debug" in content_lower:
+                action = "debug_code"
+            elif "explain" in content_lower or "analyze" in content_lower:
+                action = "analyze_code"
+            else:
+                action = "process_code"
+                
+        elif agent_type == "computer":
+            if "list" in content_lower or "show" in content_lower:
+                action = "list_files"
+            elif "read" in content_lower or "open" in content_lower:
+                action = "read_file"
+            elif "run" in content_lower or "execute" in content_lower:
+                action = "execute_command"
+            else:
+                action = "process_command"
+                
+        return {
+            "agent_type": agent_type,
+            "action": action,
+            "content": content
+        }

@@ -7,8 +7,15 @@ import shutil
 from agents.base_agent import BaseAgent
 
 class ComputerAgent(BaseAgent):
-    type = "computer"
-    capabilities = ["file_operations", "shell_execution", "task_automation"]
+    @property
+    def agent_type(self):
+        """Return the type identifier for this agent."""
+        return "computer"
+    
+    @property
+    def capabilities(self):
+        """Return a list of capabilities provided by this agent."""
+        return ["file_operations", "shell_execution", "task_automation"]
     
     async def initialize(self) -> None:
         self.processes = []
@@ -66,31 +73,69 @@ class ComputerAgent(BaseAgent):
             return "Command rejected for security reasons"
         
         try:
-            process = await asyncio.create_subprocess_shell(
-                command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=self.current_directory
-            )
+            # Handle 'cd' command differently since it needs to change our internal state
+            if command.strip().startswith("cd "):
+                new_dir = command.strip()[3:].strip()
+                
+                # Handle home directory shortcut
+                if new_dir == "~" or new_dir.startswith("~/"):
+                    home = os.path.expanduser("~")
+                    new_dir = home if new_dir == "~" else os.path.join(home, new_dir[2:])
+                
+                # Handle parent directory
+                elif new_dir == "..":
+                    new_dir = os.path.dirname(self.current_directory)
+                
+                # Handle absolute path
+                elif os.path.isabs(new_dir):
+                    pass  # Keep as is
+                
+                # Handle relative path
+                else:
+                    new_dir = os.path.join(self.current_directory, new_dir)
+                
+                # Check if directory exists
+                if os.path.isdir(new_dir):
+                    old_dir = self.current_directory
+                    self.current_directory = os.path.normpath(new_dir)
+                    return f"Changed directory from {old_dir} to {self.current_directory}"
+                else:
+                    return f"Error: Directory not found: {new_dir}"
+            
+            # For Windows, we need to use shell=True to properly execute commands
+            # but this has security implications
+            use_shell = os.name == 'nt'
+            
+            # Choose the right shell based on OS
+            if os.name == 'nt':
+                # On Windows, use cmd.exe
+                process = await asyncio.create_subprocess_shell(
+                    command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=self.current_directory,
+                    shell=True
+                )
+            else:
+                # On Unix-like systems, we can use the command directly
+                process = await asyncio.create_subprocess_shell(
+                    command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=self.current_directory
+                )
             
             self.processes.append(process)
             stdout, stderr = await process.communicate()
             
-            # Update current directory if command is cd
-            if command.strip().startswith("cd "):
-                new_dir = command.strip()[3:].strip()
-                
-                # Handle relative paths
-                if not os.path.isabs(new_dir):
-                    new_dir = os.path.join(self.current_directory, new_dir)
-                
-                if os.path.isdir(new_dir):
-                    self.current_directory = os.path.normpath(new_dir)
+            stdout_str = stdout.decode('utf-8', errors='replace') if stdout else ""
+            stderr_str = stderr.decode('utf-8', errors='replace') if stderr else ""
             
+            # For commands like 'dir' on Windows or 'ls' on Unix, ensure we get output
             if process.returncode == 0:
-                return stdout.decode() or "Command executed successfully"
+                return stdout_str if stdout_str else "Command executed successfully (no output)"
             else:
-                return f"Error: {stderr.decode()}"
+                return f"Error (code {process.returncode}):\n{stderr_str}"
                 
         except Exception as e:
             return f"Execution error: {str(e)}"
@@ -141,54 +186,23 @@ class ComputerAgent(BaseAgent):
         except Exception as e:
             return f"Failed to read file: {str(e)}"
     
-    async def cleanup(self) -> None:
+    async def cleanup(self):
+        """Clean up resources used by the agent."""
         # Terminate any running processes
         for process in self.processes:
             try:
                 process.terminate()
-                await process.wait()
             except:
                 pass
+        self.processes = []
+        return {"status": "cleaned up"}
     
-    def get_ui_components(self) -> Dict[str, Any]:
-        from app.ui.components.file_browser import FileExplorer
-        from app.ui.components.terminal import Shell
-        
-        return {
-            "main": FileExplorer,
-            "secondary": Shell,
-            "layout": "horizontal"
-        }
+    def get_ui_components(self):
+        """Get UI components for this agent."""
+        # This agent doesn't provide UI components directly
+        return []
     
-    async def handle_ui_event(self, event: str, payload: Any) -> Optional[Dict[str, Any]]:
-        if event == "execute_command":
-            result = await self._execute_shell_command(payload["command"])
-            return {
-                "type": "shell_result",
-                "result": result,
-                "current_directory": self.current_directory
-            }
-            
-        elif event == "navigate_directory":
-            path = payload["path"]
-            files = await self._list_files(path)
-            
-            if os.path.isdir(path):
-                self.current_directory = path
-                
-            return {
-                "type": "file_list",
-                "path": path,
-                "files": files,
-                "current_directory": self.current_directory
-            }
-            
-        elif event == "open_file":
-            content = await self._read_file(payload["path"])
-            return {
-                "type": "file_content",
-                "path": payload["path"],
-                "content": content
-            }
-            
-        return None
+    async def handle_ui_event(self, event_type, payload):
+        """Handle UI events specific to this agent."""
+        # This agent doesn't handle UI events directly
+        return {"status": "event ignored"}

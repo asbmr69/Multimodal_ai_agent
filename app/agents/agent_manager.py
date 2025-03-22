@@ -81,3 +81,35 @@ class AgentManager:
     def get_registered_agents(self):
         """Get a list of all registered agent types."""
         return list(self.agent_classes.keys())
+        
+    async def get_agent_status(self, agent_type):
+        """Get the status of a specific agent."""
+        if agent_type not in self.agent_classes:
+            return {
+                "registered": False,
+                "active": False,
+                "status": "unknown",
+                "message": f"Agent type '{agent_type}' is not registered."
+            }
+            
+        is_active = agent_type in self.active_agents
+        
+        if is_active:
+            # Get basic information about the agent
+            agent = self.active_agents[agent_type]
+            capabilities = agent.capabilities if hasattr(agent, 'capabilities') else []
+            
+            return {
+                "registered": True,
+                "active": True,
+                "status": "running",
+                "capabilities": capabilities,
+                "auto_terminate": agent.auto_terminate
+            }
+        else:
+            return {
+                "registered": True,
+                "active": False,
+                "status": "inactive",
+                "message": f"Agent '{agent_type}' is registered but not active."
+            }

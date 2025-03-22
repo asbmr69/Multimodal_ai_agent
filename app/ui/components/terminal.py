@@ -279,7 +279,42 @@ class Shell(QWidget):
     
     def display_result(self, result, is_error=False):
         """Display result in the terminal"""
+        # Ensure we have a result to display
+        if result is None:
+            result = "[Command executed successfully with no output]"
+            self.terminal.display_result(result, error=False)
+            self._set_executing_state(False)
+            return
+            
+        # Handle result dictionaries (from agent responses)
+        if isinstance(result, dict):
+            # Try to extract the actual result from the dictionary
+            if "result" in result:
+                result = result["result"]
+            elif "output" in result:
+                result = result["output"]
+            elif "workspace_update" in result and "result" in result["workspace_update"]:
+                result = result["workspace_update"]["result"]
+                
+                # Also update directory if available
+                if "current_directory" in result["workspace_update"]:
+                    self.set_current_directory(result["workspace_update"]["current_directory"])
+        
+        # Ensure result is a string
+        if not isinstance(result, str):
+            try:
+                result = str(result)
+            except Exception as e:
+                result = f"Error: Unable to display result (non-string format): {str(e)}"
+        
+        # Handle empty result
+        if not result.strip():
+            result = "[Command executed successfully with no output]"
+            
+        # Display in terminal
         self.terminal.display_result(result, error=is_error)
+            
+        # Always reset the executing state
         self._set_executing_state(False)
     
     def set_current_directory(self, directory):
@@ -292,3 +327,11 @@ class Shell(QWidget):
         """Connect shell to agent handler function"""
         self.agent_controller = agent_handler
         self.command_executed.connect(agent_handler)
+
+    def set_prompt(self, prompt_text):
+        """Set the prompt text directly"""
+        self.terminal.prompt_label.setText(prompt_text)
+
+    def set_executing(self, is_executing):
+        """Set the executing state of the shell"""
+        self._set_executing_state(is_executing)
